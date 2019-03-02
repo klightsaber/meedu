@@ -13,21 +13,15 @@ namespace App\Repositories;
 
 use Exception;
 use App\Models\Order;
+use App\Models\OrderGoods;
 use Illuminate\Support\Facades\DB;
-use App\Notifications\SimpleMessageNotification;
 
 class RoleRepository
 {
     public $errors = '';
 
-    public function bulHandler($user, $role)
+    public function createOrder($user, $role)
     {
-        if ($user->credit1 < $role->charge) {
-            $this->errors = '余额不足';
-
-            return false;
-        }
-
         if (
             $user->role &&
             strtotime($user->role_expired_at) > time() &&
@@ -40,23 +34,24 @@ class RoleRepository
 
         DB::beginTransaction();
         try {
-            // 创建订单记录
+            // 创建订单
             $order = $user->orders()->save(new Order([
-                'goods_id' => $role->id,
-                'goods_type' => Order::GOODS_TYPE_ROLE,
+                'order_id' => gen_order_no($user),
                 'charge' => $role->charge,
-                'status' => Order::STATUS_PAID,
+                'status' => Order::STATUS_UNPAY,
             ]));
-            // 扣除余额
-            $user->credit1Dec($role->charge);
-            // 购买会员
-            $user->buyRole($role);
-            // 消息通知
-            $user->notify(new SimpleMessageNotification($order->getNotificationContent()));
+            // 关联商品
+            $order->goods()->save(new OrderGoods([
+                'user_id' => $user->id,
+                'goods_id' => $role->id,
+                'goods_type' => OrderGoods::GOODS_TYPE_ROLE,
+                'num' => 1,
+                'charge' => $role->charge,
+            ]));
 
             DB::commit();
 
-            return true;
+            return $order;
         } catch (Exception $exception) {
             DB::rollBack();
             exception_record($exception);

@@ -32,7 +32,7 @@ class CourseResource extends JsonResource
             'charge' => $this->charge,
             'short_description' => markdown_to_html($this->short_description),
             'description' => markdown_to_html($this->description),
-            'published_at' => $this->published_at,
+            'published_at' => strtotime($this->published_at),
         ];
     }
 }

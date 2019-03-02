@@ -11,7 +11,7 @@
 
 namespace App\Events;
 
-use App\Models\RechargePayment;
+use App\Models\Order;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -21,14 +21,14 @@ class PaymentSuccessEvent
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $payment;
+    public $order;
 
     /**
      * Create a new event instance.
      */
-    public function __construct($thirdId)
+    public function __construct(Order $order)
     {
-        $this->payment = RechargePayment::whereThirdId($thirdId)->first();
+        $this->order = $order;
     }
 
     /**

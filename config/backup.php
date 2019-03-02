@@ -7,7 +7,7 @@ return [
          * The name of this application. You can use this name to monitor
          * the backups.
          */
-        'name' => config('app.name'),
+        'name' => config('app.name').'_Backup',
 
         'source' => [
 
@@ -27,7 +27,6 @@ return [
                  */
                 'exclude' => [
                     base_path('vendor'),
-                    base_path('node_modules'),
                     base_path('docs'),
                     base_path('storage/framework'),
                     base_path('tests'),

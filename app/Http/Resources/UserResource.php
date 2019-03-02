@@ -28,7 +28,7 @@ class UserResource extends JsonResource
         if ($this->role) {
             $role = [
                 'role' => $this->role->name,
-                'expired_at' => $this->role_expired_at,
+                'expired_at' => strtotime($this->role_expired_at),
             ];
         }
 
@@ -38,6 +38,7 @@ class UserResource extends JsonResource
             'mobile' => $this->mobile,
             'role' => $role,
             'unread_notification_num' => $this->unreadNotifications->count(),
+            'credit1' => $this->credit1,
         ];
     }
 }

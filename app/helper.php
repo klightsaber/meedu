@@ -69,7 +69,7 @@ if (! function_exists('exception_response')) {
      * @param Exception $exception
      * @param string    $message
      *
-     * @return array
+     * @return \Illuminate\Http\JsonResponse
      */
     function exception_response(Exception $exception, string $message = '')
     {
@@ -91,7 +91,7 @@ if (! function_exists('at_user')) {
      */
     function at_user($content, $fromUser, $from, $fromType)
     {
-        preg_match_all('/\s{1}@(.*?)\s{1}/', $content, $result);
+        preg_match_all('/@(.*?)\s{1}/', $content, $result);
         if (! ($result = optional($result)[1])) {
             return;
         }
@@ -141,7 +141,11 @@ if (! function_exists('markdown_to_html')) {
      */
     function markdown_to_html($content)
     {
-        return (new Parsedown())->parse($content);
+        $content = (new Parsedown())->setBreaksEnabled(true)->parse($content);
+        $content = clean($content);
+        $content = preg_replace('#<table>#', '<table class="table table-hover table-bordered">', $content);
+
+        return $content;
     }
 }
 
@@ -156,7 +160,7 @@ if (! function_exists('markdown_clean')) {
     function markdown_clean(string $markdownContent)
     {
         $html = markdown_to_html($markdownContent);
-        $safeHtml = clean($html);
+        $safeHtml = clean($html, null);
 
         return (new \League\HTMLToMarkdown\HtmlConverter())->convert($safeHtml);
     }
@@ -250,6 +254,7 @@ if (! function_exists('aliyun_sdk_client')) {
      */
     function aliyun_sdk_client()
     {
+        require_once app_path('Meedu/Aliyun/aliyun-php-sdk-core/Config.php');
         $profile = \DefaultProfile::getProfile(
             config('meedu.upload.video.aliyun.region', ''),
             config('meedu.upload.video.aliyun.access_key_id', ''),
@@ -258,5 +263,213 @@ if (! function_exists('aliyun_sdk_client')) {
         $client = new \DefaultAcsClient($profile);
 
         return $client;
+    }
+}
+
+if (! function_exists('backend_menus')) {
+    /**
+     * 获取当前管理员的专属菜单.
+     *
+     * @return array|mixed
+     */
+    function backend_menus()
+    {
+        $user = admin();
+        if (! $user) {
+            return collect([]);
+        }
+        if ($user->isSuper()) {
+            return (new \App\Models\AdministratorMenu())->menus();
+        }
+        $permissionIds = $user->permissionIds();
+        $permissionIds->push(0);
+        $menus = \App\Models\AdministratorMenu::with('children')
+            ->whereIn('permission_id', $permissionIds)
+            ->rootLevel()
+            ->orderAsc()
+            ->get();
+        $menus = $menus->filter(function ($menu) use ($permissionIds) {
+            if ($menu->children->isEmpty()) {
+                return false;
+            }
+            $permissionIds = $permissionIds->toArray();
+            $children = $menu->children->filter(function ($child) use ($permissionIds) {
+                return in_array($child->permission_id, $permissionIds);
+            });
+            $menu->children = $children;
+
+            return $children->count() != 0;
+        });
+
+        return $menus;
+    }
+}
+
+if (! function_exists('gen_order_no')) {
+    /**
+     * 生成订单号.
+     *
+     * @param \App\User $user
+     *
+     * @return string
+     */
+    function gen_order_no(\App\User $user)
+    {
+        $userId = str_pad($user->id, 10, 0, STR_PAD_LEFT);
+        $time = date('His');
+        $rand = mt_rand(10, 99);
+
+        return $time.$rand.$userId;
+    }
+}
+
+if (! function_exists('input_equal')) {
+    /**
+     * GET参数是否等于指定值
+     *
+     * @param $field
+     * @param $value
+     * @param string $default
+     *
+     * @return bool
+     */
+    function input_equal($field, $value, $default = '')
+    {
+        return request()->input($field, $default) == $value;
+    }
+}
+
+if (! function_exists('env_update')) {
+    /**
+     * ENV文件修改.
+     *
+     * @param array $data
+     */
+    function env_update(array $data)
+    {
+        $env = app()->make('files')->get(base_path('.env'));
+        $envRows = explode("\n", $env);
+        $updatedColumns = array_keys($data);
+        $newEnvRows = [];
+        foreach ($envRows as $envRow) {
+            if ($envRow == '') {
+                $newEnvRows[] = '';
+                continue;
+            }
+            [$itemKey, $itemValue] = explode('=', $envRow);
+            if (! in_array($itemKey, $updatedColumns)) {
+                $newEnvRows[] = $envRow;
+                continue;
+            }
+            $updatedValue = $data[$itemKey];
+            $updatedValue = str_replace(' ', '', trim($updatedValue));
+            if (is_numeric($updatedValue)) {
+                $newEnvRows[] = $itemKey.'='.$updatedValue;
+            } elseif (is_bool($updatedValue)) {
+                $newEnvRows[] = $itemKey.'='.$updatedValue ? 'true' : 'false';
+            } else {
+                $newEnvRows[] = $itemKey.'="'.$updatedValue.'"';
+            }
+        }
+        app()->make('files')->put(base_path('.env'), implode("\n", $newEnvRows));
+    }
+}
+
+if (! function_exists('v')) {
+    /**
+     * 重写视图.
+     *
+     * @param $viewName
+     * @param array $params
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    function v($viewName, $params = [])
+    {
+        $namespace = config('meedu.system.theme.use', 'default');
+        $viewName = preg_match('/::/', $viewName) ? $viewName : $namespace.'::'.$viewName;
+
+        return view($viewName, $params);
+    }
+}
+
+if (! function_exists('duration_humans')) {
+    /**
+     * @param $duration
+     *
+     * @return string
+     */
+    function duration_humans($duration)
+    {
+        if ($duration instanceof \App\Models\Video) {
+            $duration = $duration->duration;
+        }
+        $minute = intdiv($duration, 60);
+        $second = $duration % 60;
+        if ($minute > 60) {
+            $hours = intdiv($minute, 60);
+            $minute = $minute % 60;
+
+            return sprintf('%02d:%02d:%02d', $hours, $minute, $second);
+        }
+
+        return $minute ? sprintf('%02d:%02d', $minute, $second) : sprintf('00:%02d', $second);
+    }
+}
+
+if (! function_exists('view_num_humans')) {
+    /**
+     * @param $num
+     *
+     * @return string
+     */
+    function view_num_humans($num)
+    {
+        if ($num instanceof \App\Models\Video) {
+            $num = $num->view_num;
+        }
+        if ($num < 1000) {
+            return $num;
+        } elseif ($num < 10000) {
+            return intdiv($num, 1000).'k次';
+        }
+
+        return intdiv($num, 10000).'w次';
+    }
+}
+
+if (! function_exists('enabled_socialites')) {
+    /**
+     * 获取已启用的第三方登录.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    function enabled_socialites()
+    {
+        $socialites = config('meedu.member.socialite', []);
+        $enabled = collect($socialites)->filter(function ($item) {
+            return $item['enabled'];
+        });
+
+        return $enabled;
+    }
+}
+
+if (! function_exists('get_payments')) {
+    /**
+     * 获取可用的Payment.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    function get_payments()
+    {
+        $payments = collect(config('meedu.payment'))->reject(function ($payment) {
+            $enabled = $payment['enabled'] ?? true;
+            $pc = $payment['pc'] ?? true;
+
+            return $enabled || $pc;
+        });
+
+        return $payments;
     }
 }

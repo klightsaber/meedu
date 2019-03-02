@@ -32,10 +32,6 @@ class Course extends Model
         'seo_description', 'published_at', 'is_show',
     ];
 
-    protected $appends = [
-        'edit_url', 'destroy_url',
-    ];
-
     /**
      * 该课程所属用户.
      *
@@ -44,6 +40,14 @@ class Course extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function chapters()
+    {
+        return $this->hasMany(CourseChapter::class, 'course_id');
     }
 
     /**
@@ -103,16 +107,6 @@ class Course extends Model
         return $query->where('published_at', '<=', date('Y-m-d H:i:s'));
     }
 
-    public function getEditUrlAttribute()
-    {
-        return route('backend.course.edit', $this);
-    }
-
-    public function getDestroyUrlAttribute()
-    {
-        return route('backend.course.destroy', $this);
-    }
-
     /**
      * 作用域：关键词搜索.
      *
@@ -133,7 +127,7 @@ class Course extends Model
      */
     public function getDescription()
     {
-        return markdown_to_html($this->description);
+        return $this->description;
     }
 
     /**
@@ -141,7 +135,7 @@ class Course extends Model
      */
     public function getAllPublishedAndShowVideosCache()
     {
-        if (! config('meedu.system.cache.status')) {
+        if (config('meedu.system.cache.status', -1) != 1) {
             return $this->getAllPublishedAndShowVideos();
         }
         $that = $this;
@@ -166,6 +160,66 @@ class Course extends Model
             ->show()
             ->orderBy('published_at')
             ->get();
+    }
+
+    /**
+     * 章节缓存.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection|mixed
+     */
+    public function getChaptersCache()
+    {
+        if (config('meedu.system.cache.status', -1) != 1) {
+            return $this->getChapters();
+        }
+        $that = $this;
+
+        return Cache::remember(
+            "course_{$this->id}_chapter_videos",
+            config('meedu.system.cache.expire', 60),
+            function () use ($that) {
+                return $that->getChapters();
+            });
+    }
+
+    /**
+     * 获取章节
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getChapters()
+    {
+        return $this->chapters()->orderBy('sort')->get();
+    }
+
+    /**
+     * 是否存在缓存.
+     *
+     * @return bool|mixed
+     */
+    public function hasChaptersCache()
+    {
+        if (config('meedu.system.cache.status', -1) != 1) {
+            return $this->hasChapters();
+        }
+        $that = $this;
+
+        return Cache::remember(
+            "course_{$this->id}_has_chapters",
+            config('meedu.system.cache.expire', 60),
+            function () use ($that) {
+                return $that->hasChapters();
+            });
+    }
+
+    /**
+     * 是否存在章节
+     *
+     * @return bool
+     */
+    public function hasChapters()
+    {
+        return $this->chapters()->exists();
     }
 
     /**

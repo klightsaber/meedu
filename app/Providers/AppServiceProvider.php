@@ -12,9 +12,9 @@
 namespace App\Providers;
 
 use Carbon\Carbon;
+use App\Meedu\Setting;
 use App\Models\CourseComment;
 use Laravel\Passport\Passport;
-use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use App\Observers\CourseCommentObserver;
@@ -26,19 +26,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        // 中文
         Carbon::setLocale('zh');
+        // 数据库
         Schema::defaultStringLength(191);
+        // 模型事件
         CourseComment::observe(CourseCommentObserver::class);
-        Paginator::useBootstrapThree();
+        // OAuth路由
         Passport::routes();
-
-        // 加载配置
-        if (file_exists(config('meedu.save'))) {
-            $config = json_decode(file_get_contents(config('meedu.save')));
-            foreach ($config as $key => $item) {
-                config([$key => $item]);
-            }
-        }
+        // 自定义配置同步
+        $this->app->make(Setting::class)->sync();
+        $this->registerViewNamespace();
     }
 
     /**
@@ -46,5 +44,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
+    }
+
+    /**
+     * 注册视图.
+     */
+    protected function registerViewNamespace()
+    {
+        $this->loadViewsFrom(config('meedu.system.theme.path'), config('meedu.system.theme.use'));
     }
 }

@@ -15,9 +15,10 @@ use App\Models\Course;
 use Illuminate\Http\Request;
 use App\Exceptions\ApiV1Exception;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\VideoRecourse;
 use App\Http\Resources\CourseResource;
+use App\Http\Resources\CourseListResource;
 use App\Http\Resources\CourseCommentResource;
+use App\Http\Resources\CourseVideoListResource;
 use App\Http\Requests\Frontend\CourseOrVideoCommentCreateRequest;
 
 class CourseController extends Controller
@@ -31,12 +32,17 @@ class CourseController extends Controller
      */
     public function index(Request $request)
     {
+        $keywords = $request->input('keywords', '');
+
         $courses = Course::show()
+            ->when($keywords, function ($query) use ($keywords) {
+                return $query->where('title', 'like', "%{$keywords}%");
+            })
             ->published()
             ->orderByDesc('created_at')
             ->paginate($request->input('page_size', 10));
 
-        return CourseResource::collection($courses);
+        return CourseListResource::collection($courses);
     }
 
     /**
@@ -65,7 +71,7 @@ class CourseController extends Controller
         $course = Course::show()->published()->whereId($id)->firstOrFail();
         $videos = $course->getAllPublishedAndShowVideosCache();
 
-        return VideoRecourse::collection($videos);
+        return CourseVideoListResource::collection($videos);
     }
 
     /**

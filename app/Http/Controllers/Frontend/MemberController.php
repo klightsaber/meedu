@@ -14,6 +14,7 @@ namespace App\Http\Controllers\Frontend;
 use App\Models\Announcement;
 use Illuminate\Support\Facades\Auth;
 use App\Repositories\MemberRepository;
+use App\Http\Requests\Frontend\Member\MobileBindRequest;
 use App\Http\Requests\Frontend\Member\AvatarChangeRequest;
 use App\Http\Requests\Frontend\Member\MemberPasswordResetRequest;
 
@@ -25,14 +26,35 @@ class MemberController extends FrontendController
         $videos = Auth::user()->buyVideos()->orderByDesc('pivot_created_at')->limit(10)->get();
         $title = '会员中心';
 
-        return view('frontend.member.index', compact('announcement', 'videos', 'title'));
+        return v('frontend.member.index', compact('announcement', 'videos', 'title'));
     }
 
     public function showPasswordResetPage()
     {
         $title = '修改密码';
 
-        return view('frontend.member.password_reset', compact('title'));
+        return v('frontend.member.password_reset', compact('title'));
+    }
+
+    public function showMobileBindPage()
+    {
+        $title = '绑定手机号';
+
+        return v('frontend.member.mobile_bind', compact('title'));
+    }
+
+    public function mobileBindHandler(MobileBindRequest $request)
+    {
+        $user = \auth()->user();
+        if ($user->isBindMobile()) {
+            flash('当前账户已绑定手机号，请勿重复绑定');
+
+            return back();
+        }
+        $user->fill($request->filldata())->save();
+        flash('绑定成功', 'success');
+
+        return redirect(route('member'));
     }
 
     /**
@@ -59,7 +81,7 @@ class MemberController extends FrontendController
     {
         $title = '更换头像';
 
-        return view('frontend.member.avatar', compact('title'));
+        return v('frontend.member.avatar', compact('title'));
     }
 
     /**
@@ -91,7 +113,7 @@ class MemberController extends FrontendController
         $records = $repository->roleBuyRecords();
         $title = 'VIP会员记录';
 
-        return view('frontend.member.join_role_records', compact('records', 'title'));
+        return v('frontend.member.join_role_records', compact('records', 'title'));
     }
 
     /**
@@ -106,7 +128,7 @@ class MemberController extends FrontendController
         $messages = $repository->messages();
         $title = '我的消息';
 
-        return view('frontend.member.messages', compact('messages', 'title'));
+        return v('frontend.member.messages', compact('messages', 'title'));
     }
 
     /**
@@ -121,7 +143,7 @@ class MemberController extends FrontendController
         $courses = $repository->buyCourses();
         $title = '我的购买的课程';
 
-        return view('frontend.member.buy_course', compact('courses', 'title'));
+        return v('frontend.member.buy_course', compact('courses', 'title'));
     }
 
     /**
@@ -136,7 +158,7 @@ class MemberController extends FrontendController
         $videos = $repository->buyVideos();
         $title = '我购买的视频';
 
-        return view('frontend.member.buy_video', compact('videos', 'title'));
+        return v('frontend.member.buy_video', compact('videos', 'title'));
     }
 
     /**
@@ -151,7 +173,7 @@ class MemberController extends FrontendController
         $records = $repository->rechargeRecords();
         $title = '我的充值记录';
 
-        return view('frontend.member.show_recharge_records', compact('records', 'title'));
+        return v('frontend.member.show_recharge_records', compact('records', 'title'));
     }
 
     /**
@@ -166,6 +188,32 @@ class MemberController extends FrontendController
         $orders = $repository->orders();
         $title = '我的订单';
 
-        return view('frontend.member.show_orders', compact('orders', 'title'));
+        return v('frontend.member.show_orders', compact('orders', 'title'));
+    }
+
+    /**
+     * 显示我的电子书界面.
+     *
+     * @param MemberRepository $repository
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function showBooksPage(MemberRepository $repository)
+    {
+        $books = $repository->buyBooks();
+
+        return v('frontend.member.show_books', compact('books'));
+    }
+
+    /**
+     * 显示第三方登录界面.
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function showSocialitePage()
+    {
+        $apps = Auth::user()->socialite()->get();
+
+        return v('frontend.member.socialite', compact('apps'));
     }
 }

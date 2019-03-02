@@ -28,12 +28,12 @@ class VideoRecourse extends JsonResource
             'id' => $this->id,
             'title' => $this->title,
             'slug' => $this->slug,
-            'thumb' => $this->thumb,
-            'view_num' => $this->view_num,
-            'charge' => $this->charge,
+            'view_num' => (int) $this->view_num,
+            'charge' => (int) $this->charge,
             'short_description' => markdown_to_html($this->short_description),
             'description' => markdown_to_html($this->description),
-            'published_at' => $this->published_at,
+            'published_at' => strtotime($this->published_at),
+            'duration' => $this->duration,
         ];
     }
 }
